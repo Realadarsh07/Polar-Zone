@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polar Zone | Advanced Integrated Polar Science Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        arctic: {
+                            950: '#010409',
+                            900: '#020617',
+                            800: '#0f172a',
+                            700: '#1e293b',
+                            accent: '#38bdf8',
+                            glow: '#00FF66'
+                        }
+                    }
+                }
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRepositoriesAndAdminList();
+            initUploadDropZone();
+        });
+    </script>
+    <!-- Three.js for Realistic 3D Globe -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Chart.js for Climate Analytics Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #010409;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .aurora-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            background: radial-gradient(circle at 15% 20%, rgba(14, 165, 233, 0.16) 0%, transparent 45%),
+                        radial-gradient(circle at 85% 80%, rgba(0, 255, 102, 0.12) 0%, transparent 45%),
+                        #010409;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--duration) infinite ease-in-out;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; transform: scale(0.8); }
+            50% { opacity: 0.95; transform: scale(1.3); }
+        }
+        .glowing-green-box {
+            border: 2px solid #00FF66;
+            box-shadow: 0 0 22px rgba(0, 255, 102, 0.4);
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(14px);
+            transition: all 0.35s ease;
+        }
+        .glowing-green-box:hover {
+            box-shadow: 0 0 38px rgba(0, 255, 102, 0.65);
+            transform: translateY(-4px);
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #010409; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FF66; }
+
+        /* Admin Upload Drop Zone */
+        .drop{
+          border:1.5px dashed var(--line);border-radius:12px;padding:20px;text-align:center;
+          color:var(--muted-2);font-size:.85rem;cursor:pointer;transition:border-color .2s,color .2s;
+        }
+        .drop:hover,.drop.drag{border-color:var(--aurora);color:var(--ice-strong)}
+        .drop input{display:none}
+        .file-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:120px;overflow-y:auto}
+        .file-list li{display:flex;align-items:center;gap:9px;font-size:.82rem;color:var(--text);background:var(--bg-panel-2);border-radius:8px;padding:7px 10px}
+        .file-list li svg{width:15px;height:15px;flex:none;color:var(--aurora)}
+        .file-list .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .file-note{font-size:.72rem;color:var(--muted-2);margin:0}
+        /* Theme fallbacks for the supplied drop-zone variables */
+        :root{--line:#334155;--muted-2:#64748b;--aurora:#00FF66;--ice-strong:#dbeafe;--text:#f8fafc;--bg-panel-2:#0f172a}
+    </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+    <div class="aurora-bg" id="starfield"></div>
+
+    <header class="sticky top-0 z-50 bg-arctic-950/90 backdrop-blur-md border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Logo & Banner -->
+                <div class="flex items-center space-x-3.5 cursor-pointer group" onclick="switchTab('home')">
+                    <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-400 via-teal-400 to-emerald-400 flex items-center justify-center shadow-lg shadow-sky-500/30 group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-snowflake text-arctic-950 text-2xl animate-spin" style="animation-duration: 25s;"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-sky-300 via-teal-200 to-emerald-300 bg-clip-text text-transparent" data-i18n="title">POLAR ZONE</h1>
+                        <p class="text-xs text-slate-400 tracking-wide font-medium" data-i18n="tagline">All information at one place</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Navigation Tabs -->
+                <nav class="hidden xl:flex items-center space-x-1">
+                    <button onclick="switchTab('home')" id="nav-home" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-sky-400 bg-slate-800/80 shadow">
+                        <i class="fa-solid fa-house mr-1.5"></i><span data-i18n="menu_home">Home</span>
+                    </button>
+                    <button onclick="switchTab('research')" id="nav-research" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-flask mr-1.5"></i><span data-i18n="menu_research">Research</span>
+                    </button>
+                    <button onclick="switchTab('media')" id="nav-media" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-photo-film mr-1.5"></i><span data-i18n="menu_media">Media</span>
+                    </button>
+                    <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-chart-line mr-1.5"></i><span data-i18n="menu_analytics">Analytics</span>
+                    </button>
+                    <button onclick="switchTab('ai')" id="nav-ai" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-robot mr-1.5"></i><span data-i18n="menu_ai">AI Assistant</span>
+                    </button>
+                    <button onclick="switchTab('search')" id="nav-search" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-magnifying-glass mr-1.5"></i><span data-i18n="menu_search">Search</span>
+                    </button>
+                    <button onclick="switchTab('news')" id="nav-news" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-800/40">
+                        <i class="fa-solid fa-newspaper mr-1.5"></i><span data-i18n="menu_news">News</span>
+                    </button>
+                    <button onclick="switchTab('admin')" id="nav-admin" class="nav-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all border border-[#00FF66]/40 text-[#00FF66]">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i><span data-i18n="menu_admin">Admin Upload</span>
+                    </button>
+                </nav>
+
+                <!-- Language Toggle & Mobile Menu -->
+                <div class="flex items-center space-x-3">
+                    <button onclick="toggleLanguage()" class="px-3.5 py-2 rounded-xl border border-sky-500/40 text-xs font-bold text-sky-300 hover:bg-sky-500/10 transition-all flex items-center space-x-1.5 shadow-sm">
+                        <i class="fa-solid fa-globe text-sky-400"></i>
+                        <span id="lang-label">हिन्दी / ENG</span>
+                    </button>
+                    <button onclick="toggleMobileMenu()" class="xl:hidden p-2 rounded-xl text-slate-300 hover:bg-slate-800">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div id="mobile-menu" class="hidden xl:hidden px-4 pt-2 pb-4 border-t border-slate-800 bg-arctic-950/95 space-y-2">
+            <button onclick="switchTab('home'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-sky-400 bg-slate-800"><i class="fa-solid fa-house mr-2"></i> Home</button>
+            <button onclick="switchTab('research'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-flask mr-2"></i> Research</button>
+            <button onclick="switchTab('media'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-photo-film mr-2"></i> Media Repository</button>
+            <button onclick="switchTab('analytics'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-chart-line mr-2"></i> Climate Analytics</button>
+            <button onclick="switchTab('ai'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-robot mr-2"></i> AI Polar Assistant</button>
+            <button onclick="switchTab('search'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-magnifying-glass mr-2"></i> Search</button>
+            <button onclick="switchTab('news'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:bg-slate-800"><i class="fa-solid fa-newspaper mr-2"></i> Recent News</button>
+            <button onclick="switchTab('admin'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-[#00FF66] bg-emerald-500/10 border border-[#00FF66]/40"><i class="fa-solid fa-cloud-arrow-up mr-2"></i> Admin Upload Portal</button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ==================== HOME VIEW ==================== -->
+        <section id="view-home" class="space-y-12">
+            <!-- Hero Banner -->
+            <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border border-slate-800 p-8 sm:p-12 shadow-2xl">
+                <div class="absolute -right-10 -bottom-10 opacity-10 text-9xl text-sky-400 pointer-events-none">
+                    <i class="fa-solid fa-snowflake"></i>
+                </div>
+                <div class="max-w-3xl space-y-6">
+                    <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs font-bold">
+                        <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                        <span data-i18n="badge_portal">Integrated National Polar Science Portal (SIH #26063)</span>
+                    </div>
+                    <h2 class="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight text-white">
+                        <span data-i18n="hero_title">Exploring Earth's Ultimate Polar Frontiers</span>
+                    </h2>
+                    <p class="text-base sm:text-lg text-slate-300 leading-relaxed font-normal" data-i18n="hero_desc">
+                        Your unified portal for Arctic and Antarctic research data, live station telemetry, multimedia archives, AI analytics, and peer-reviewed scientific publications. All information at one place.
+                    </p>
+                    <div class="flex flex-wrap gap-4 pt-2">
+                        <button onclick="openFeature('map')" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/30 transition-all flex items-center space-x-2.5">
+                            <i class="fa-solid fa-earth-americas text-lg"></i>
+                            <span data-i18n="btn_explore_globe">Launch 3D Realistic Globe</span>
+                        </button>
+                        <button onclick="switchTab('ai')" class="px-6 py-3.5 rounded-xl bg-slate-800 border border-sky-500/50 text-sky-300 font-bold hover:bg-slate-700 transition-all flex items-center space-x-2.5">
+                            <i class="fa-solid fa-robot"></i>
+                            <span data-i18n="btn_ai_assistant">Ask AI PolarBot</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Important Features Section (Enclosed in square boxes with glowing green borders) -->
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl sm:text-2xl font-bold text-white flex items-center space-x-2.5">
+                        <i class="fa-solid fa-star text-[#00FF66]"></i>
+                        <span data-i18n="important_features_title">Key Portal Modules (SIH Requirements)</span>
+                    </h3>
+                    <span class="text-xs text-[#00FF66] font-bold px-3.5 py-1 rounded-full bg-emerald-500/10 border border-[#00FF66]/40" data-i18n="highlight_badge">
+                        Interactive Modules
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- 1. 3D Map Module -->
+                    <div class="glowing-green-box rounded-3xl p-7 flex flex-col justify-between cursor-pointer group" onclick="openFeature('map')">
+                        <div class="space-y-4">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-[#00FF66]/50 flex items-center justify-center text-[#00FF66] text-2xl group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-earth-americas"></i>
+                            </div>
+                            <h4 class="text-xl font-bold text-white" data-i18n="mod_map_title">3D Map (Arctic & Antarctica)</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed" data-i18n="mod_map_desc">
+                                Google-Map-like realistic 3D Earth globe that you can rotate freely by hand/mouse/touch. Features explicit pins for Arctic, Antarctica, Maitri, Bharati, and Himadri.
+                            </p>
+                        </div>
+                        <div class="mt-8 pt-4 border-t border-[#00FF66]/30 flex items-center justify-between text-[#00FF66] text-sm font-bold">
+                            <span data-i18n="launch_module">Open 3D Globe</span>
+                            <i class="fa-solid fa-arrow-right group-hover:translate-x-1.5 transition-transform"></i>
+                        </div>
+                    </div>
+
+                    <!-- 2. Admin Upload Module -->
+                    <div class="glowing-green-box rounded-3xl p-7 flex flex-col justify-between cursor-pointer group" onclick="switchTab('admin')">
+                        <div class="space-y-4">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-[#00FF66]/50 flex items-center justify-center text-[#00FF66] text-2xl group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </div>
+                            <h4 class="text-xl font-bold text-white" data-i18n="mod_admin_title">Admin Upload Portal</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed" data-i18n="mod_admin_desc">
+                                Fully functional upload portal with persistent localStorage. Instantly publish research papers, expedition photos, and videos with deletion controls.
+                            </p>
+                        </div>
+                        <div class="mt-8 pt-4 border-t border-[#00FF66]/30 flex items-center justify-between text-[#00FF66] text-sm font-bold">
+                            <span data-i18n="launch_portal">Open Upload Portal</span>
+                            <i class="fa-solid fa-arrow-right group-hover:translate-x-1.5 transition-transform"></i>
+                        </div>
+                    </div>
+
+                    <!-- 3. Media & Research Repository Module -->
+                    <div class="glowing-green-box rounded-3xl p-7 flex flex-col justify-between cursor-pointer group" onclick="switchTab('research')">
+                        <div class="space-y-4">
+                            <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-[#00FF66]/50 flex items-center justify-center text-[#00FF66] text-2xl group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-photo-film"></i>
+                            </div>
+                            <h4 class="text-xl font-bold text-white" data-i18n="mod_media_title">Media & Research Repository</h4>
+                            <p class="text-sm text-slate-300 leading-relaxed" data-i18n="mod_media_desc">
+                                Comprehensive searchable repository of photographs, documentary films, infographics, and open-access research papers synchronized with admin uploads.
+                            </p>
+                        </div>
+                        <div class="mt-8 pt-4 border-t border-[#00FF66]/30 flex items-center justify-between text-[#00FF66] text-sm font-bold">
+                            <span data-i18n="explore_repository">Explore Repository</span>
+                            <i class="fa-solid fa-arrow-right group-hover:translate-x-1.5 transition-transform"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Statistics Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center">
+                    <div class="text-3xl font-extrabold text-sky-400 mb-1">42+</div>
+                    <div class="text-xs text-slate-400" data-i18n="stat_stations">Active Research Stations</div>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center">
+                    <div class="text-3xl font-extrabold text-[#00FF66] mb-1" id="stat-papers-count">1,425</div>
+                    <div class="text-xs text-slate-400" data-i18n="stat_papers">Research Papers Indexed</div>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center">
+                    <div class="text-3xl font-extrabold text-teal-400 mb-1" id="stat-media-count">8,510+</div>
+                    <div class="text-xs text-slate-400" data-i18n="stat_media">Media Assets & Videos</div>
+                </div>
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 text-center">
+                    <div class="text-3xl font-extrabold text-indigo-400 mb-1">24/7</div>
+                    <div class="text-xs text-slate-400" data-i18n="stat_telemetry">Live Telemetry Feed</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== RESEARCH VIEW ==================== -->
+        <section id="view-research" class="hidden space-y-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white" data-i18n="research_heading">Polar Research & Knowledge Repository</h2>
+                    <p class="text-slate-400 text-sm mt-1" data-i18n="research_sub">Access peer-reviewed studies, glaciology reports, and admin-uploaded papers.</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <select id="research-filter" onchange="filterResearch()" class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500">
+                        <option value="all" data-i18n="opt_all_domains">All Domains</option>
+                        <option value="glaciology" data-i18n="opt_glaciology">Glaciology</option>
+                        <option value="atmospheric" data-i18n="opt_atmospheric">Atmospheric Science</option>
+                        <option value="marine" data-i18n="opt_marine">Marine Biology</option>
+                        <option value="climate" data-i18n="opt_climate">Climate Dynamics</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="research-list">
+                <!-- Research Card 1 -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-slate-700 transition-all" data-category="glaciology">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-xs font-semibold">Glaciology</span>
+                            <span class="text-xs text-slate-400">Published: Jan 2026</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Mass Balance Assessment of Larsemann Hills Glaciers, East Antarctica</h3>
+                        <p class="text-sm text-slate-300 line-clamp-3">Comprehensive satellite altimetry and ground-penetrating radar measurements assessing decadal ice mass fluctuations surrounding the Bharati station.</p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">Dr. Rajesh Kumar et al. (NCAOR)</span>
+                        <button onclick="downloadPaper('Larsemann_Hills_Glaciology_2026.pdf')" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-[#00FF66] hover:bg-emerald-500/30 text-xs font-bold flex items-center space-x-1.5 transition-colors">
+                            <i class="fa-solid fa-download"></i><span>PDF (4.2 MB)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Research Card 2 -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-slate-700 transition-all" data-category="atmospheric">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full bg-emerald-500/10 text-[#00FF66] text-xs font-semibold">Atmospheric Science</span>
+                            <span class="text-xs text-slate-400">Published: Dec 2025</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-white">Stratospheric Ozone Depletion Dynamics Over Himadri Station, Svalbard</h3>
+                        <p class="text-sm text-slate-300 line-clamp-3">Balloon-borne ozonesonde observations revealing seasonal vortex isolation anomalies and boundary layer dynamics in the high Arctic.</p>
+                    </div>
+                    <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">Dr. Anna Sorensen & Team</span>
+                        <button onclick="downloadPaper('Svalbard_Ozone_Dynamics_2025.pdf')" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-[#00FF66] hover:bg-emerald-500/30 text-xs font-bold flex items-center space-x-1.5 transition-colors">
+                            <i class="fa-solid fa-download"></i><span>PDF (6.8 MB)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== MEDIA VIEW ==================== -->
+        <section id="view-media" class="hidden space-y-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white" data-i18n="media_heading">Polar Media & Knowledge Repository</h2>
+                    <p class="text-slate-400 text-sm mt-1" data-i18n="media_sub">Curated imagery, documentary footage, and media assets.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="filterMediaTab('all')" class="media-btn px-4 py-2 rounded-xl bg-[#00FF66] text-slate-950 text-xs font-bold transition-colors">All Assets</button>
+                    <button onclick="filterMediaTab('images')" class="media-btn px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800 transition-colors">Images</button>
+                    <button onclick="filterMediaTab('videos')" class="media-btn px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800 transition-colors">Videos</button>
+                    <button onclick="filterMediaTab('infographics')" class="media-btn px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800 transition-colors">Infographics</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" id="media-grid">
+                <!-- Media Item 1 -->
+                <div class="media-card bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group" data-type="images">
+                    <div class="h-48 bg-slate-800 relative flex items-center justify-center overflow-hidden">
+                        <img src="https://placehold.co/600x400/0f172a/38bdf8?text=Aurora+Australis+Maitri" alt="Aurora" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/600x400/0f172a/38bdf8?text=Polar+Image'">
+                        <div class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur text-xs text-sky-300 font-medium">Image</div>
+                    </div>
+                    <div class="p-4 space-y-2">
+                        <h4 class="font-bold text-white text-sm">Aurora Australis Over Maitri Station</h4>
+                        <p class="text-xs text-slate-400">Captured during geomagnetic storm monitoring, May 2025.</p>
+                        <button onclick="showToast('Opening high-res image preview...')" class="text-xs text-[#00FF66] font-bold hover:underline flex items-center space-x-1 pt-1">
+                            <i class="fa-solid fa-eye"></i><span>View Asset</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Media Item 2 -->
+                <div class="media-card bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group" data-type="videos">
+                    <div class="h-48 bg-slate-800 relative flex items-center justify-center overflow-hidden">
+                        <img src="https://placehold.co/600x400/0f172a/00FF66?text=Glacier+Calving+Documentary" alt="Glacier" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://placehold.co/600x400/0f172a/00FF66?text=Polar+Video'">
+                        <div class="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-emerald-500/90 text-slate-950 flex items-center justify-center text-lg pl-0.5 shadow-lg group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-play"></i>
+                            </div>
+                        </div>
+                        <div class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur text-xs text-[#00FF66] font-medium">Video</div>
+                    </div>
+                    <div class="p-4 space-y-2">
+                        <h4 class="font-bold text-white text-sm">Glacier Calving Dynamics in Svalbard</h4>
+                        <p class="text-xs text-slate-400">Documentary footage recorded via drone telemetry near Himadri.</p>
+                        <button onclick="showToast('Streaming video player...')" class="text-xs text-[#00FF66] font-bold hover:underline flex items-center space-x-1 pt-1">
+                            <i class="fa-solid fa-play"></i><span>Stream Video</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CLIMATE ANALYTICS VIEW ==================== -->
+        <section id="view-analytics" class="hidden space-y-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white" data-i18n="analytics_heading">Polar Climate Analytics Dashboard</h2>
+                    <p class="text-slate-400 text-sm mt-1" data-i18n="analytics_sub">Real-time telemetry and decadal climate metrics powered by Chart.js.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-[#00FF66] animate-ping"></span>
+                    <span class="text-xs text-[#00FF66] font-bold">Live Telemetry Synchronized</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Chart 1: Arctic Sea Ice Extent -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-white text-base">Arctic Sea Ice Extent (Million km²)</h3>
+                        <span class="text-xs px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 font-semibold">Decadal Trend</span>
+                    </div>
+                    <div class="h-72 relative">
+                        <canvas id="iceExtentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Antarctic Temperature Anomalies -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-white text-base">Antarctic Temperature Anomaly (°C)</h3>
+                        <span class="text-xs px-2.5 py-1 rounded-lg bg-emerald-500/20 text-[#00FF66] font-semibold">Station Maitri Data</span>
+                    </div>
+                    <div class="h-72 relative">
+                        <canvas id="tempAnomalyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== AI ASSISTANT VIEW ("PolarBot") ==================== -->
+        <section id="view-ai" class="hidden space-y-8 max-w-4xl mx-auto">
+            <div class="bg-slate-950 border-2 border-sky-500/60 rounded-3xl p-6 sm:p-8 shadow-[0_0_50px_rgba(56,189,248,0.2)] flex flex-col h-[70vh]">
+                <!-- AI Header -->
+                <div class="flex items-center space-x-4 border-b border-slate-800 pb-4 mb-4">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/50 flex items-center justify-center text-sky-400 text-xl">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">PolarBot - AI Polar Research Assistant</h2>
+                        <p class="text-xs text-slate-400">Ask any question regarding Arctic/Antarctic expeditions, ice cores, or Indian research stations.</p>
+                    </div>
+                </div>
+
+                <!-- Chat Messages Area -->
+                <div id="chat-messages" class="flex-grow overflow-y-auto space-y-4 pr-2">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-400 text-xs flex-shrink-0">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm text-slate-200 max-w-[85%] leading-relaxed">
+                            Hello! I am PolarBot. How can I assist you with polar science, station telemetry, or research papers today?
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suggested Quick Prompts -->
+                <div class="py-3 flex flex-wrap gap-2">
+                    <button onclick="sendQuickPrompt('Tell me about Maitri station')" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-sky-300 hover:bg-slate-800">Tell me about Maitri station</button>
+                    <button onclick="sendQuickPrompt('What is ice core sampling?')" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-sky-300 hover:bg-slate-800">What is ice core sampling?</button>
+                    <button onclick="sendQuickPrompt('Explain Himadri station in Svalbard')" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-sky-300 hover:bg-slate-800">Himadri station</button>
+                </div>
+
+                <!-- Chat Input Form -->
+                <form onsubmit="handleAiSubmit(event)" class="flex items-center space-x-3 pt-3 border-t border-slate-800">
+                    <input type="text" id="ai-input" required placeholder="Ask PolarBot anything about polar research..." class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sky-500">
+                    <button type="submit" class="px-6 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold transition-colors flex items-center space-x-2">
+                        <span>Send</span><i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ==================== SEARCH VIEW ==================== -->
+        <section id="view-search" class="hidden space-y-8">
+            <div class="max-w-2xl mx-auto text-center space-y-4">
+                <h2 class="text-2xl sm:text-4xl font-extrabold text-white" data-i18n="search_heading">Global Polar Knowledge Discovery</h2>
+                <p class="text-slate-400 text-sm" data-i18n="search_sub">Search across all expedition logs, station telemetry, research papers, and multimedia archives instantly.</p>
+                <div class="relative">
+                    <input type="text" id="global-search-input" oninput="performSearch()" placeholder="Search by keyword, station name, author, or species..." class="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-[#00FF66] shadow-xl">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                </div>
+            </div>
+
+            <div class="max-w-4xl mx-auto space-y-4" id="search-results-container">
+                <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 text-sm">
+                    Type a query above to search across the entire Polar Zone repository.
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== RECENT NEWS VIEW ==================== -->
+        <section id="view-news" class="hidden space-y-8">
+            <div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white" data-i18n="news_heading">Recent Polar Expeditions & News</h2>
+                <p class="text-slate-400 text-sm mt-1" data-i18n="news_sub">Live dispatches from field researchers in the Arctic and Antarctic.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- News Card 1 -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all">
+                    <div>
+                        <div class="h-48 bg-gradient-to-tr from-sky-900 to-teal-900 flex items-center justify-center relative overflow-hidden">
+                            <i class="fa-solid fa-ship text-6xl text-sky-400/30"></i>
+                            <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 text-xs font-semibold backdrop-blur">Expedition Log</span>
+                        </div>
+                        <div class="p-6 space-y-3">
+                            <span class="text-xs text-slate-400">February 24, 2026</span>
+                            <h3 class="text-lg font-bold text-white">43rd Indian Scientific Expedition to Antarctica Reaches Maitri</h3>
+                            <p class="text-sm text-slate-300 line-clamp-3">The multi-institutional team has successfully commenced drilling operations at Schirmacher Oasis for deep ice-core paleoclimate reconstruction.</p>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <button onclick="showToast('Loading full expedition dispatch...')" class="text-sky-400 text-sm font-bold hover:underline flex items-center space-x-1">
+                            <span>Read Full Story</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- News Card 2 -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all">
+                    <div>
+                        <div class="h-48 bg-gradient-to-tr from-emerald-900 to-sky-900 flex items-center justify-center relative overflow-hidden">
+                            <i class="fa-solid fa-satellite text-6xl text-emerald-400/30"></i>
+                            <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-emerald-500/20 text-[#00FF66] text-xs font-semibold backdrop-blur">Technology</span>
+                        </div>
+                        <div class="p-6 space-y-3">
+                            <span class="text-xs text-slate-400">February 18, 2026</span>
+                            <h3 class="text-lg font-bold text-white">Autonomous Polar Weather Stations Deployed in Svalbard</h3>
+                            <p class="text-sm text-slate-300 line-clamp-3">New solar-powered IoT telemetry nodes successfully installed near Ny-Ålesund, transmitting real-time meteorological data directly to the Polar Zone repository.</p>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <button onclick="showToast('Loading technology briefing...')" class="text-sky-400 text-sm font-bold hover:underline flex items-center space-x-1">
+                            <span>Read Full Story</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- News Card 3 -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-slate-700 transition-all">
+                    <div>
+                        <div class="h-48 bg-gradient-to-tr from-indigo-900 to-purple-900 flex items-center justify-center relative overflow-hidden">
+                            <i class="fa-solid fa-graduation-cap text-6xl text-purple-400/30"></i>
+                            <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-semibold backdrop-blur">Outreach</span>
+                        </div>
+                        <div class="p-6 space-y-3">
+                            <span class="text-xs text-slate-400">February 10, 2026</span>
+                            <h3 class="text-lg font-bold text-white">National Polar Science Fellowship Program 2026 Announced</h3>
+                            <p class="text-sm text-slate-300 line-clamp-3">Ministry of Earth Sciences invites doctoral candidates to apply for joint research grants focusing on polar cryosphere dynamics and climate modeling.</p>
+                        </div>
+                    </div>
+                    <div class="p-6 pt-0">
+                        <button onclick="showToast('Loading fellowship guidelines...')" class="text-sky-400 text-sm font-bold hover:underline flex items-center space-x-1">
+                            <span>Read Full Story</span><i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== ADMIN UPLOAD VIEW (Dedicated Tab & Module) ==================== -->
+        <section id="view-admin" class="hidden space-y-8 max-w-4xl mx-auto">
+            <div class="bg-slate-950 border-2 border-[#00FF66] rounded-3xl p-6 sm:p-10 shadow-[0_0_50px_rgba(0,255,102,0.25)] space-y-8">
+                <div class="flex items-center space-x-4 border-b border-slate-800 pb-6">
+                    <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-[#00FF66]/50 flex items-center justify-center text-[#00FF66] text-2xl">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-white" data-i18n="admin_heading">Admin & Researcher Upload Portal</h2>
+                        <p class="text-xs text-slate-400" data-i18n="admin_sub">Publish research papers, expedition photos, and telemetry datasets with persistent storage.</p>
+                    </div>
+                </div>
+
+                <form id="upload-form" onsubmit="handleUploadSubmit(event)" class="space-y-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-2">Content Category</label>
+                            <select id="upload-category" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#00FF66]">
+                                <option value="research">Research Paper / PDF</option>
+                                <option value="images">Expedition Image Gallery</option>
+                                <option value="videos">Documentary / Field Video</option>
+                                <option value="infographics">Infographics / Data Sheet</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-2">Author / Station Origin</label>
+                            <input type="text" id="upload-author" required placeholder="e.g., Dr. Meenakshi (Maitri)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#00FF66]">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-2">Title / Subject</label>
+                        <input type="text" id="upload-title" required placeholder="e.g., Ice Core Isotope Analysis Q1 2026" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#00FF66]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-2">Upload File / Media</label>
+                        <div id="upload-drop" class="drop" tabindex="0" role="button" aria-label="Choose files to upload">
+                            <input type="file" id="upload-files" multiple accept=".pdf,.mp4,.png,.jpg,.jpeg,.webp,.csv,.xlsx,.doc,.docx">
+                            <i class="fa-solid fa-file-arrow-up text-4xl text-[#00FF66] mb-3"></i>
+                            <p class="text-xs text-slate-300 font-medium">Drag and drop files here, or <span class="text-[#00FF66] underline">browse files</span></p>
+                            <p class="file-note mt-1">Supports PDF, MP4, PNG, JPG, WEBP, CSV, XLSX, DOC, DOCX</p>
+                        </div>
+                        <ul id="upload-file-list" class="file-list mt-3"></ul>
+                    </div>
+                    <button type="submit" class="w-full py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/30 transition-all flex items-center justify-center space-x-2 text-base">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Upload and Publish to Repository</span>
+                    </button>
+                </form>
+
+                <!-- Manage / Delete Custom Uploads Section -->
+                <div class="pt-8 border-t border-slate-800 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-white">Manage Your Uploaded Items</h4>
+                        <span id="upload-count-badge" class="text-xs text-[#00FF66] px-3 py-1 rounded-full bg-emerald-500/10 border border-[#00FF66]/30 font-bold">0 Items</span>
+                    </div>
+                    <div id="admin-uploads-list" class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                        <div class="text-xs text-slate-500 italic p-4 text-center bg-slate-900/40 rounded-xl border border-slate-800">No custom uploads yet. Use the form above to add papers or media.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 3D MAP MODAL ==================== -->
+        <div id="modal-map" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+            <div class="bg-slate-950 border-2 border-[#00FF66] rounded-3xl w-full max-w-6xl h-[88vh] flex flex-col overflow-hidden shadow-[0_0_60px_rgba(0,255,102,0.35)]">
+                <!-- Modal Header -->
+                <div class="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-[#00FF66]/50 flex items-center justify-center text-[#00FF66]">
+                            <i class="fa-solid fa-earth-americas"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-white" data-i18n="map_modal_title">Realistic 3D Globe (Rotate by Hand or Mouse)</h3>
+                            <p class="text-xs text-slate-400" data-i18n="map_modal_sub">Click and drag by hand/mouse/touch to rotate. Click markers for polar station telemetry.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <!-- Camera Quick Focus & Layer Controls -->
+                        <div class="hidden sm:flex items-center space-x-2">
+                            <button onclick="focusArctic()" class="px-3 py-1.5 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-bold hover:bg-sky-500/30 transition-all">
+                                <i class="fa-solid fa-snowflake mr-1"></i> Arctic
+                            </button>
+                            <button onclick="focusAntarctica()" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-[#00FF66]/40 text-[#00FF66] text-xs font-bold hover:bg-emerald-500/30 transition-all">
+                                <i class="fa-solid fa-icicles mr-1"></i> Antarctica
+                            </button>
+                            <button onclick="toggleIceLayer()" id="ice-toggle-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all">
+                                <i class="fa-solid fa-layer-group mr-1"></i> Toggle Ice Caps
+                            </button>
+                            <button onclick="resetGlobeView()" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-all">
+                                Reset
+                            </button>
+                        </div>
+                        <button onclick="closeFeature('map')" class="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Globe Canvas Container -->
+                <div class="relative flex-grow bg-slate-950 cursor-grab active:cursor-grabbing" id="globe-container">
+                    <!-- Mobile Quick Focus Bar -->
+                    <div class="absolute top-4 left-4 right-4 sm:hidden flex justify-center space-x-2 z-10">
+                        <button onclick="focusArctic()" class="px-2.5 py-1 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-300 text-[10px] font-bold">Arctic</button>
+                        <button onclick="focusAntarctica()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-[#00FF66]/40 text-[#00FF66] text-[10px] font-bold">Antarctica</button>
+                        <button onclick="resetGlobeView()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold">Reset</button>
+                    </div>
+
+                    <!-- Station & Pole Info Overlay Card -->
+                    <div id="station-info-card" class="absolute bottom-6 left-6 right-6 sm:right-auto sm:w-90 bg-slate-900/95 border border-[#00FF66]/60 rounded-2xl p-5 backdrop-blur shadow-2xl hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 id="station-name" class="font-bold text-white text-base">Location Name</h4>
+                            <span id="station-type" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-[#00FF66]">Polar Region</span>
+                        </div>
+                        <p id="station-details" class="text-xs text-slate-300 mb-4 leading-relaxed">Telemetry and coordinates info...</p>
+                        <div class="grid grid-cols-2 gap-2.5 text-center text-xs">
+                            <div class="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700">
+                                <div class="text-slate-400 text-[10px]">Temperature</div>
+                                <div id="station-temp" class="font-bold text-sky-400">-22°C</div>
+                            </div>
+                            <div class="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700">
+                                <div class="text-slate-400 text-[10px]">Wind Speed</div>
+                                <div id="station-wind" class="font-bold text-[#00FF66]">24 km/h</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification Box -->
+        <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 border-2 border-[#00FF66] text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-3">
+            <i class="fa-solid fa-circle-check text-[#00FF66] text-lg"></i>
+            <span id="toast-message" class="text-sm font-medium">Notification message here</span>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-20 border-t border-slate-800 bg-arctic-950 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-emerald-400 flex items-center justify-center">
+                    <i class="fa-solid fa-snowflake text-arctic-950 text-xs"></i>
+                </div>
+                <span class="text-sm font-bold text-white" data-i18n="footer_brand">Polar Zone Portal</span>
+            </div>
+            <p class="text-xs text-slate-400 text-center" data-i18n="footer_copyright">
+                © 2026 Polar Zone. Developed for Smart India Hackathon (SIH #26063). All information at one place.
+            </p>
+            <div class="flex items-center space-x-4 text-slate-400 text-xs">
+                <a href="#" class="hover:text-sky-400 transition-colors" data-i18n="footer_privacy">Privacy</a>
+                <a href="#" class="hover:text-sky-400 transition-colors" data-i18n="footer_terms">Terms</a>
+                <a href="#" class="hover:text-sky-400 transition-colors" data-i18n="footer_contact">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Generate Starfield Background
+        const starfield = document.getElementById('starfield');
+        const starCount = 80;
+        for (let i = 0; i < starCount; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            const size = Math.random() * 2.5 + 1;
+            star.style.width = `${size}px`;
+            star.style.height = `${size}px`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.setProperty('--duration', `${Math.random() * 3 + 2}s`);
+            starfield.appendChild(star);
+        }
+
+        // Multi-page Tab Switching Logic
+        const tabs = ['home', 'research', 'media', 'analytics', 'ai', 'search', 'news', 'admin'];
+        function switchTab(tabId) {
+            tabs.forEach(t => {
+                const el = document.getElementById(`view-${t}`);
+                const btn = document.getElementById(`nav-${t}`);
+                if (el) el.classList.add('hidden');
+                if (btn) {
+                    btn.classList.remove('text-sky-400', 'bg-slate-800/80', 'shadow');
+                    if(t !== 'admin') btn.classList.add('text-slate-300', 'hover:text-white', 'hover:bg-slate-800/40');
+                }
+            });
+            const targetEl = document.getElementById(`view-${tabId}`);
+            const targetBtn = document.getElementById(`nav-${tabId}`);
+            if (targetEl) targetEl.classList.remove('hidden');
+            if (targetBtn) {
+                targetBtn.classList.remove('text-slate-300', 'hover:text-white', 'hover:bg-slate-800/40');
+                targetBtn.classList.add('text-sky-400', 'bg-slate-800/80', 'shadow');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // Initialize charts if analytics tab is opened
+            if (tabId === 'analytics' && !chartsInitialized) {
+                initCharts();
+            }
+        }
+
+        // Mobile Menu Toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Feature Modals Controller
+        function openFeature(featureName) {
+            const modal = document.getElementById(`modal-${featureName}`);
+            if (modal) {
+                modal.classList.remove('hidden');
+                if (featureName === 'map' && !globeInitialized) {
+                    initGoogleMapStyleGlobe();
+                }
+            }
+        }
+
+        function closeFeature(featureName) {
+            const modal = document.getElementById(`modal-${featureName}`);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // Toast Notification System
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // Persistent Admin Uploads using localStorage (with Delete capability)
+        function getStoredUploads() {
+            try {
+                return JSON.parse(localStorage.getItem('polarZoneUploads')) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveUploadToStorage(item) {
+            const uploads = getStoredUploads();
+            uploads.push(item);
+            localStorage.setItem('polarZoneUploads', JSON.stringify(uploads));
+            renderRepositoriesAndAdminList();
+        }
+
+        function deleteUploadFromStorage(id) {
+            let uploads = getStoredUploads();
+            uploads = uploads.filter(u => u.id !== id);
+            localStorage.setItem('polarZoneUploads', JSON.stringify(uploads));
+            
+            const resEl = document.getElementById(`uploaded-res-${id}`);
+            if (resEl) resEl.remove();
+            const medEl = document.getElementById(`uploaded-med-${id}`);
+            if (medEl) medEl.remove();
+
+            renderRepositoriesAndAdminList();
+            showToast('Item deleted successfully from repository');
+        }
+
+        function renderRepositoriesAndAdminList() {
+            const uploads = getStoredUploads();
+            const researchList = document.getElementById('research-list');
+            const mediaGrid = document.getElementById('media-grid');
+            const adminList = document.getElementById('admin-uploads-list');
+            const countBadge = document.getElementById('upload-count-badge');
+
+            document.getElementById('stat-papers-count').textContent = 1425 + uploads.filter(u => u.category === 'research').length;
+            document.getElementById('stat-media-count').textContent = (8510 + uploads.filter(u => u.category !== 'research').length) + '+';
+            countBadge.textContent = `${uploads.length} Items`;
+
+            if (uploads.length === 0) {
+                adminList.innerHTML = `<div class="text-xs text-slate-500 italic p-4 text-center bg-slate-900/40 rounded-xl border border-slate-800">No custom uploads yet. Use the form above to add papers or media.</div>`;
+            } else {
+                let adminHtml = '';
+                uploads.forEach(item => {
+                    adminHtml += `
+                        <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                            <div class="space-y-0.5 max-w-[70%]">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-[#00FF66] uppercase">${item.category}</span>
+                                <h5 class="font-bold text-white truncate text-sm">${item.title}</h5>
+                                <span class="text-slate-400 text-[10px]">${item.author}</span>
+                            </div>
+                            <button onclick="deleteUploadFromStorage(${item.id})" class="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-bold transition-colors">
+                                <i class="fa-solid fa-trash-can mr-1"></i> Delete
+                            </button>
+                        </div>
+                    `;
+                });
+                adminList.innerHTML = adminHtml;
+            }
+
+            uploads.filter(u => u.category === 'research').forEach(item => {
+                if (!document.getElementById(`uploaded-res-${item.id}`)) {
+                    const card = document.createElement('div');
+                    card.id = `uploaded-res-${item.id}`;
+                    card.className = 'bg-slate-900/80 border border-[#00FF66]/60 rounded-2xl p-6 flex flex-col justify-between hover:border-[#00FF66] transition-all';
+                    card.setAttribute('data-category', 'glaciology');
+                    card.innerHTML = `
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="px-3 py-1 rounded-full bg-emerald-500/10 text-[#00FF66] text-xs font-semibold">User Uploaded Research</span>
+                                <span class="text-xs text-slate-400">Just Now</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white">${item.title}</h3>
+                            <p class="text-sm text-slate-300">Newly added peer-reviewed dataset and publication uploaded via Admin Portal.</p>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
+                            <span class="text-xs text-slate-400">${item.author}</span>
+                            <button onclick="downloadPaper('${item.title}.pdf')" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-[#00FF66] hover:bg-emerald-500/30 text-xs font-bold flex items-center space-x-1.5 transition-colors">
+                                <i class="fa-solid fa-download"></i><span>PDF Document</span>
+                            </button>
+                        </div>
+                    `;
+                    researchList.prepend(card);
+                }
+            });
+
+            uploads.filter(u => u.category !== 'research').forEach(item => {
+                if (!document.getElementById(`uploaded-med-${item.id}`)) {
+                    const mCard = document.createElement('div');
+                    mCard.id = `uploaded-med-${item.id}`;
+                    mCard.className = 'media-card bg-slate-900 border border-[#00FF66]/60 rounded-2xl overflow-hidden group';
+                    mCard.setAttribute('data-type', item.category);
+                    mCard.innerHTML = `
+                        <div class="h-48 bg-slate-800 relative flex items-center justify-center overflow-hidden">
+                            <img src="https://placehold.co/600x400/0f172a/00FF66?text=${encodeURIComponent(item.title)}" alt="Upload" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            <div class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur text-xs text-[#00FF66] font-medium uppercase">${item.category}</div>
+                        </div>
+                        <div class="p-4 space-y-2">
+                            <h4 class="font-bold text-white text-sm">${item.title}</h4>
+                            <p class="text-xs text-slate-400">Uploaded by ${item.author}</p>
+                            <button onclick="showToast('Opening uploaded asset...')" class="text-xs text-[#00FF66] font-bold hover:underline flex items-center space-x-1 pt-1">
+                                <i class="fa-solid fa-eye"></i><span>View Asset</span>
+                            </button>
+                        </div>
+                    `;
+                    mediaGrid.prepend(mCard);
+                }
+            });
+        }
+
+        // Admin upload drop-zone
+        let selectedUploadFiles = [];
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return `${(bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
+        }
+
+        function renderSelectedUploadFiles() {
+            const list = document.getElementById('upload-file-list');
+            if (!list) return;
+            list.innerHTML = selectedUploadFiles.map((file, index) => `
+                <li>
+                    <i class="fa-solid fa-file text-[#00FF66]"></i>
+                    <span class="fname flex-1">${file.name}</span>
+                    <span class="text-[10px] text-slate-500">${formatFileSize(file.size)}</span>
+                    <button type="button" onclick="removeSelectedUploadFile(${index})" class="text-red-400 hover:text-red-300" aria-label="Remove ${file.name}">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </li>
+            `).join('');
+        }
+
+        function setSelectedUploadFiles(fileList) {
+            const incoming = Array.from(fileList || []);
+            const combined = [...selectedUploadFiles, ...incoming];
+            const unique = [];
+            const seen = new Set();
+            combined.forEach(file => {
+                const key = `${file.name}-${file.size}-${file.lastModified}`;
+                if (!seen.has(key)) { seen.add(key); unique.push(file); }
+            });
+            selectedUploadFiles = unique;
+            renderSelectedUploadFiles();
+        }
+
+        function removeSelectedUploadFile(index) {
+            selectedUploadFiles.splice(index, 1);
+            renderSelectedUploadFiles();
+        }
+
+        function initUploadDropZone() {
+            const drop = document.getElementById('upload-drop');
+            const input = document.getElementById('upload-files');
+            if (!drop || !input || drop.dataset.ready) return;
+            drop.dataset.ready = 'true';
+
+            drop.addEventListener('click', (event) => {
+                if (event.target !== input) input.click();
+            });
+            drop.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    input.click();
+                }
+            });
+            input.addEventListener('change', () => setSelectedUploadFiles(input.files));
+
+            ['dragenter', 'dragover'].forEach(type => {
+                drop.addEventListener(type, event => {
+                    event.preventDefault();
+                    drop.classList.add('drag');
+                });
+            });
+            ['dragleave', 'drop'].forEach(type => {
+                drop.addEventListener(type, event => {
+                    event.preventDefault();
+                    drop.classList.remove('drag');
+                });
+            });
+            drop.addEventListener('drop', event => setSelectedUploadFiles(event.dataTransfer.files));
+        }
+
+        function handleUploadSubmit(e) {
+            e.preventDefault();
+            const title = document.getElementById('upload-title').value;
+            const category = document.getElementById('upload-category').value;
+            const author = document.getElementById('upload-author').value;
+            const files = selectedUploadFiles.map(file => ({
+                name: file.name,
+                size: file.size,
+                type: file.type
+            }));
+
+            const newItem = {
+                id: Date.now(),
+                title,
+                category,
+                author,
+                files
+            };
+
+            saveUploadToStorage(newItem);
+            showToast(`Successfully uploaded & published "${title}"!`);
+            document.getElementById('upload-form').reset();
+            selectedUploadFiles = [];
+            renderSelectedUploadFiles();
+            switchTab(category === 'research' ? 'research' : 'media');
+        }
+
+        // Research Filter
+        function filterResearch() {
+            const filter = document.getElementById('research-filter').value;
+            const cards = document.querySelectorAll('#research-list > div');
+            cards.forEach(card => {
+                const cat = card.getAttribute('data-category');
+                if (filter === 'all' || cat === filter) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // Global Search Simulator
+        function performSearch() {
+            const query = document.getElementById('global-search-input').value.toLowerCase().trim();
+            const container = document.getElementById('search-results-container');
+            if (!query) {
+                container.innerHTML = `<div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 text-sm">Type a query above to search across the entire Polar Zone repository.</div>`;
+                return;
+            }
+
+            const uploads = getStoredUploads();
+            const mockResults = [
+                { title: "Mass Balance Assessment of Larsemann Hills Glaciers", type: "Research Paper", station: "Bharati Station", date: "Jan 2026" },
+                { title: "Stratospheric Ozone Depletion Dynamics Over Himadri", type: "Research Paper", station: "Himadri Station", date: "Dec 2025" },
+                { title: "43rd Indian Scientific Expedition to Antarctica Reaches Maitri", type: "Expedition News", station: "Maitri Station", date: "Feb 2026" },
+                { title: "Aurora Australis Over Maitri Station Timelapse", type: "Media Asset", station: "Maitri Station", date: "May 2025" },
+                ...uploads.map(u => ({ title: u.title, type: u.category.toUpperCase(), station: u.author, date: "Just Now" }))
+            ];
+
+            const filtered = mockResults.filter(r => r.title.toLowerCase().includes(query) || r.station.toLowerCase().includes(query) || r.type.toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-400 text-sm">No results found matching "${query}".</div>`;
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(item => {
+                html += `
+                    <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between hover:border-slate-700 transition-all">
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-[#00FF66]">${item.type}</span>
+                                <span class="text-xs text-slate-400">${item.station}</span>
+                            </div>
+                            <h4 class="font-bold text-white text-sm">${item.title}</h4>
+                        </div>
+                        <button onclick="showToast('Opening repository item...')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#00FF66] text-xs font-bold">View</button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Media Gallery Filter
+        function filterMediaTab(type) {
+            const buttons = document.querySelectorAll('.media-btn');
+            buttons.forEach(b => {
+                b.classList.remove('bg-[#00FF66]', 'text-slate-950');
+                b.classList.add('bg-slate-900', 'border', 'border-slate-700', 'text-slate-300');
+            });
+            event.target.classList.remove('bg-slate-900', 'border', 'border-slate-700', 'text-slate-300');
+            event.target.classList.add('bg-[#00FF66]', 'text-slate-950');
+
+            const cards = document.querySelectorAll('.media-card');
+            cards.forEach(card => {
+                const t = card.getAttribute('data-type');
+                if (type === 'all' || t === type) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function downloadPaper(filename) {
+            showToast(`Downloading ${filename} from secure repository...`);
+        }
+
+        // ==================== AI POLARBOT LOGIC ==================== -->
+        function handleAiSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('ai-input');
+            const q = input.value.trim();
+            if (!q) return;
+            appendChatMessage(q, 'user');
+            input.value = '';
+
+            setTimeout(() => {
+                generateAiResponse(q);
+            }, 700);
+        }
+
+        function sendQuickPrompt(promptText) {
+            document.getElementById('ai-input').value = promptText;
+            switchTab('ai');
+        }
+
+        function appendChatMessage(text, sender) {
+            const container = document.getElementById('chat-messages');
+            const isUser = sender === 'user';
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex items-start space-x-3 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`;
+            msgDiv.innerHTML = `
+                <div class="w-8 h-8 rounded-full ${isUser ? 'bg-emerald-500/20 text-[#00FF66]' : 'bg-sky-500/20 text-sky-400'} flex items-center justify-center text-xs flex-shrink-0">
+                    <i class="fa-solid ${isUser ? 'fa-user' : 'fa-robot'}"></i>
+                </div>
+                <div class="${isUser ? 'bg-emerald-500/10 border border-emerald-500/30 text-white' : 'bg-slate-900 border border-slate-800 text-slate-200'} rounded-2xl p-4 text-sm max-w-[85%] leading-relaxed">
+                    ${text}
+                </div>
+            `;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function generateAiResponse(query) {
+            const q = query.toLowerCase();
+            let reply = "Based on NCAOR and WMO polar datasets, polar regions are experiencing rapid shifts in cryospheric stability. How else can I assist your research?";
+            if (q.includes('maitri')) {
+                reply = "Maitri is India's second permanent Antarctic research station, located in the rocky mountainous region known as Schirmacher Oasis. It operationalizes studies in geology, meteorology, and cold region engineering.";
+            } else if (q.includes('himadri')) {
+                reply = "Himadri is India's first Arctic research station, located at Ny-Ålesund in Svalbard, Norway (78°N). It serves as a base for atmospheric, biological, and glaciological research in the high Arctic.";
+            } else if (q.includes('ice core') || q.includes('sampling')) {
+                reply = "Ice core sampling involves extracting cylindrical ice columns from glaciers. These cores preserve trapped atmospheric bubbles and isotopic records dating back hundreds of thousands of years, crucial for paleoclimate reconstruction.";
+            }
+            appendChatMessage(reply, 'bot');
+        }
+
+        // ==================== CHART.JS ANALYTICS DASHBOARD ==================== -->
+        let chartsInitialized = false;
+        function initCharts() {
+            if (chartsInitialized) return;
+            chartsInitialized = true;
+
+            // Ice Extent Chart
+            const ctxIce = document.getElementById('iceExtentChart').getContext('2d');
+            new Chart(ctxIce, {
+                type: 'line',
+                data: {
+                    labels: ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'],
+                    datasets: [{
+                        label: 'Arctic Sea Ice (Million km²)',
+                        data: [4.72, 4.64, 4.70, 4.32, 3.82, 4.92, 4.67, 4.37, 4.28, 4.22],
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8' } } },
+                    scales: {
+                        x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            // Temperature Anomaly Chart
+            const ctxTemp = document.getElementById('tempAnomalyChart').getContext('2d');
+            new Chart(ctxTemp, {
+                type: 'bar',
+                data: {
+                    labels: ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'],
+                    datasets: [{
+                        label: 'Antarctic Temp Anomaly (°C)',
+                        data: [0.85, 1.12, 0.94, 1.45, 1.82, 1.25, 1.68, 2.10, 1.95, 2.05],
+                        backgroundColor: '#00FF66',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8' } } },
+                    scales: {
+                        x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        // ==================== THREE.JS 3D GLOBE (MOVE BY HAND / MOUSE / TOUCH) ==================== -->
+        let globeInitialized = false;
+        let globeMesh, markerGroup, globeScene, globeCamera, globeRenderer, iceCapMesh;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let iceCapsVisible = true;
+
+        function initGoogleMapStyleGlobe() {
+            if (globeInitialized) return;
+            globeInitialized = true;
+
+            const container = document.getElementById('globe-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            globeScene = new THREE.Scene();
+            globeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            globeCamera.position.z = 3.6;
+
+            globeRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            globeRenderer.setSize(width, height);
+            globeRenderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(globeRenderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
+            globeScene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0x38bdf8, 2.0);
+            directionalLight.position.set(6, 4, 6);
+            globeScene.add(directionalLight);
+
+            // Procedural Satellite Earth Texture
+            const canvas2D = document.createElement('canvas');
+            canvas2D.width = 2048;
+            canvas2D.height = 1024;
+            const ctx = canvas2D.getContext('2d');
+
+            ctx.fillStyle = '#061426';
+            ctx.fillRect(0, 0, canvas2D.width, canvas2D.height);
+
+            ctx.fillStyle = '#1b382b';
+            ctx.beginPath(); ctx.arc(520, 340, 190, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(560, 660, 150, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(1220, 310, 270, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(1160, 690, 170, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(1660, 760, 110, 0, Math.PI * 2); ctx.fill();
+
+            // Polar Ice Caps on Texture
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas2D.width, 140);
+            ctx.fillRect(0, canvas2D.height - 150, canvas2D.width, 150);
+
+            const earthTexture = new THREE.CanvasTexture(canvas2D);
+
+            const globeGeometry = new THREE.SphereGeometry(1, 64, 64);
+            const globeMaterial = new THREE.MeshStandardMaterial({
+                map: earthTexture,
+                roughness: 0.5,
+                metalness: 0.1
+            });
+            globeMesh = new THREE.Mesh(globeGeometry, globeMaterial);
+            globeScene.add(globeMesh);
+
+            // Atmosphere Glow Ring
+            const atmosGeometry = new THREE.SphereGeometry(1.045, 64, 64);
+            const atmosMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00FF66,
+                transparent: true,
+                opacity: 0.12,
+                side: THREE.BackSide
+            });
+            const atmosphere = new THREE.Mesh(atmosGeometry, atmosMaterial);
+            globeScene.add(atmosphere);
+
+            // Polar Locations
+            const locations = [
+                { name: "Arctic (North Pole)", type: "Arctic Pole", lat: 88.0, lon: 0.0, temp: "-31°C", wind: "35 km/h", desc: "The northernmost point of Earth, characterized by shifting sea ice and polar bear habitats." },
+                { name: "Antarctica (South Pole)", type: "Antarctic Pole", lat: -88.0, lon: 0.0, temp: "-48°C", wind: "42 km/h", desc: "The southernmost continent, holding 90% of Earth's ice and extreme dry polar conditions." },
+                { name: "Maitri Station (Antarctica)", type: "Indian Station", lat: -70.76, lon: 11.73, temp: "-22°C", wind: "28 km/h", desc: "India's second permanent Antarctic research station located in Schirmacher Oasis." },
+                { name: "Bharati Station (Antarctica)", type: "Indian Station", lat: -69.40, lon: 76.19, temp: "-19°C", wind: "34 km/h", desc: "India's state-of-the-art Antarctic research station focusing on oceanographic studies." },
+                { name: "Himadri Station (Arctic)", type: "Indian Station", lat: 78.92, lon: 11.93, temp: "-12°C", wind: "18 km/h", desc: "India's first Arctic research station located at Ny-Ålesund, Svalbard." }
+            ];
+
+            function latLonToVector3(lat, lon, radius) {
+                const phi = (90 - lat) * (Math.PI / 180);
+                const theta = (lon + 180) * (Math.PI / 180);
+                const x = -(radius * Math.sin(phi) * Math.cos(theta));
+                const z = (radius * Math.sin(phi) * Math.sin(theta));
+                const y = (radius * Math.cos(phi));
+                return new THREE.Vector3(x, y, z);
+            }
+
+            markerGroup = new THREE.Group();
+            locations.forEach(loc => {
+                const pos = latLonToVector3(loc.lat, loc.lon, 1.03);
+                const markerGeo = new THREE.SphereGeometry(0.05, 16, 16);
+                const markerMat = new THREE.MeshBasicMaterial({ color: loc.type.includes('Pole') ? 0x38bdf8 : 0x00FF66 });
+                const marker = new THREE.Mesh(markerGeo, markerMat);
+                marker.position.copy(pos);
+                marker.userData = loc;
+                markerGroup.add(marker);
+            });
+            globeScene.add(markerGroup);
+
+            // Pointer Drag Handlers
+            container.addEventListener('pointerdown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+                container.setPointerCapture(e.pointerId);
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+
+                globeMesh.rotation.y += deltaX * 0.006;
+                globeMesh.rotation.x += deltaY * 0.006;
+                markerGroup.rotation.y = globeMesh.rotation.y;
+                markerGroup.rotation.x = globeMesh.rotation.x;
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+
+            container.addEventListener('pointerup', (e) => {
+                isDragging = false;
+                try { container.releasePointerCapture(e.pointerId); } catch(err) {}
+            });
+
+            container.addEventListener('pointercancel', (e) => {
+                isDragging = false;
+            });
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                globeCamera.position.z += e.deltaY * 0.002;
+                globeCamera.position.z = Math.max(2.2, Math.min(6.0, globeCamera.position.z));
+            }, { passive: false });
+
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            container.addEventListener('click', (e) => {
+                const rect = globeRenderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, globeCamera);
+                const intersects = raycaster.intersectObjects(markerGroup.children);
+
+                if (intersects.length > 0) {
+                    const data = intersects[0].object.userData;
+                    displayLocationInfo(data);
+                }
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                if (!isDragging) {
+                    globeMesh.rotation.y += 0.001;
+                    markerGroup.rotation.y = globeMesh.rotation.y;
+                }
+                globeRenderer.render(globeScene, globeCamera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                globeCamera.aspect = w / h;
+                globeCamera.updateProjectionMatrix();
+                globeRenderer.setSize(w, h);
+            });
+        }
+
+        function displayLocationInfo(data) {
+            document.getElementById('station-name').textContent = data.name;
+            document.getElementById('station-type').textContent = data.type;
+            document.getElementById('station-details').textContent = data.desc;
+            document.getElementById('station-temp').textContent = data.temp;
+            document.getElementById('station-wind').textContent = data.wind;
+            document.getElementById('station-info-card').classList.remove('hidden');
+            showToast(`Selected ${data.name}`);
+        }
+
+        function focusArctic() {
+            if (!globeMesh) return;
+            globeMesh.rotation.x = 1.3;
+            globeMesh.rotation.y = 0;
+            markerGroup.rotation.x = globeMesh.rotation.x;
+            markerGroup.rotation.y = globeMesh.rotation.y;
+            displayLocationInfo({ name: "Arctic (North Pole)", type: "Arctic Pole", temp: "-31°C", wind: "35 km/h", desc: "The northernmost point of Earth, characterized by shifting sea ice and polar bear habitats." });
+            showToast('Camera focused on Arctic (North Pole)');
+        }
+
+        function focusAntarctica() {
+            if (!globeMesh) return;
+            globeMesh.rotation.x = -1.3;
+            globeMesh.rotation.y = 0;
+            markerGroup.rotation.x = globeMesh.rotation.x;
+            markerGroup.rotation.y = globeMesh.rotation.y;
+            displayLocationInfo({ name: "Antarctica (South Pole)", type: "Antarctic Pole", temp: "-48°C", wind: "42 km/h", desc: "The southernmost continent, holding 90% of Earth's ice and extreme dry polar conditions." });
+            showToast('Camera focused on Antarctica (South Pole)');
+        }
+
+        function resetGlobeView() {
+            if (!globeMesh) return;
+            globeMesh.rotation.x = 0;
+            globeMesh.rotation.y = 0;
+            markerGroup.rotation.x = 0;
+            markerGroup.rotation.y = 0;
+            document.getElementById('station-info-card').classList.add('hidden');
+            showToast('Reset 3D globe view');
+        }
+
+        function toggleIceLayer() {
+            iceCapsVisible = !iceCapsVisible;
+            if (globeMesh) {
+                globeMesh.material.wireframe = !iceCapsVisible;
+            }
+            showToast(iceCapsVisible ? 'Ice cap overlay enabled' : 'Ice cap overlay toggled off (wireframe view)');
+        }
+
+        // Bilingual Translation Dictionary (English / Hindi)
+        let currentLang = 'en';
+        const translations = {
+            en: {
+                title: "POLAR ZONE",
+                tagline: "All information at one place",
+                menu_home: "Home",
+                menu_research: "Research",
+                menu_media: "Media",
+                menu_analytics: "Analytics",
+                menu_ai: "AI Assistant",
+                menu_search: "Search",
+                menu_news: "News",
+                menu_admin: "Admin Upload",
+                badge_portal: "Integrated National Polar Science Portal (SIH #26063)",
+                hero_title: "Exploring Earth's Ultimate Polar Frontiers",
+                hero_desc: "Your unified portal for Arctic and Antarctic research data, live station telemetry, multimedia archives, AI analytics, and peer-reviewed scientific publications. All information at one place.",
+                btn_explore_globe: "Launch 3D Realistic Globe",
+                btn_ai_assistant: "Ask AI PolarBot",
+                important_features_title: "Key Portal Modules (SIH Requirements)",
+                highlight_badge: "Interactive Modules",
+                mod_map_title: "3D Map (Arctic & Antarctica)",
+                mod_map_desc: "Google-Map-like realistic 3D Earth globe that you can rotate freely by hand/mouse/touch. Features explicit pins for Arctic, Antarctica, Maitri, Bharati, and Himadri.",
+                launch_module: "Open 3D Globe",
+                mod_admin_title: "Admin Upload Portal",
+                mod_admin_desc: "Fully functional upload portal with persistent localStorage. Instantly publish research papers, expedition photos, and videos with deletion controls.",
+                launch_portal: "Open Upload Portal",
+                mod_media_title: "Media & Research Repository",
+                mod_media_desc: "Comprehensive searchable repository of photographs, documentary films, infographics, and open-access research papers synchronized with admin uploads.",
+                explore_repository: "Explore Repository",
+                stat_stations: "Active Research Stations",
+                stat_papers: "Research Papers Indexed",
+                stat_media: "Media Assets & Videos",
+                stat_telemetry: "Live Telemetry Feed",
+                research_heading: "Polar Research & Knowledge Repository",
+                research_sub: "Access peer-reviewed studies, glaciology reports, and admin-uploaded papers.",
+                media_heading: "Polar Media & Knowledge Repository",
+                media_sub: "Curated imagery, documentary footage, and media assets.",
+                analytics_heading: "Polar Climate Analytics Dashboard",
+                analytics_sub: "Real-time telemetry and decadal climate metrics powered by Chart.js.",
+                search_heading: "Global Polar Knowledge Discovery",
+                search_sub: "Search across all expedition logs, station telemetry, research papers, and multimedia archives instantly.",
+                news_heading: "Recent Polar Expeditions & News",
+                news_sub: "Live dispatches from field researchers in the Arctic and Antarctic.",
+                admin_heading: "Admin & Researcher Upload Portal",
+                admin_sub: "Publish research papers, expedition photos, and telemetry datasets with persistent storage.",
+                footer_brand: "Polar Zone Portal",
+                footer_copyright: "© 2026 Polar Zone. Developed for Smart India Hackathon (SIH #26063). All information at one place.",
+                footer_privacy: "Privacy",
+                footer_terms: "Terms",
+                footer_contact: "Contact"
+            },
+            hi: {
+                title: "पोलर ज़ोन",
+                tagline: "एक ही स्थान पर सभी जानकारी",
+                menu_home: "होम",
+                menu_research: "शोध",
+                menu_media: "मीडिया",
+                menu_analytics: "एनालिटिक्स",
+                menu_ai: "AI सहायक",
+                menu_search: "खोज",
+                menu_news: "समाचार",
+                menu_admin: "एडमिन अपलोड",
+                badge_portal: "एकीकृत राष्ट्रीय ध्रुवीय विज्ञान पोर्टल (एसआईएच #26063)",
+                hero_title: "पृथ्वी की अंतिम ध्रुवीय सीमाओं की खोज",
+                hero_desc: "आर्कटिक और अंटार्कटिक अनुसंधान डेटा, लाइव स्टेशन टेलीमेट्री, मल्टीमीडिया अभिलेखागार, AI एनालिटिक्स और सहकर्मी-समीक्षा वैज्ञानिक प्रकाशनों के लिए आपका एकीकृत पोर्टल। सभी जानकारी एक ही स्थान पर।",
+                btn_explore_globe: "3D यथार्थवादी ग्लोब लॉन्च करें",
+                btn_ai_assistant: "AI पोलरबॉट से पूछें",
+                important_features_title: "प्रमुख पोर्टल मॉड्यूल (एसआईएच आवश्यकताएँ)",
+                highlight_badge: "इंटरैक्टिव मॉड्यूल",
+                mod_map_title: "3D मानचित्र (आर्कटिक और अंटार्कटिका)",
+                mod_map_desc: "गूगल-मैप जैसा यथार्थवादी 3D पृथ्वी ग्लोब जिसे आप हाथ/माउस से घुमा सकते हैं। इसमें आर्कटिक, अंटार्कटिका और भारतीय स्टेशनों के लिए पिन हैं।",
+                launch_module: "3D ग्लोब खोलें",
+                mod_admin_title: "एडमिन अपलोड पोर्टल",
+                mod_admin_desc: "स्थानीय भंडारण के साथ पूरी तरह कार्यात्मक अपलोड पोर्टल। शोध पत्र, तस्वीरें और वीडियो तुरंत प्रकाशित करें।",
+                launch_portal: "पोर्टल खोलें",
+                mod_media_title: "मीडिया और अनुसंधान भंडार",
+                mod_media_desc: "तस्वीरें, वृत्तचित्र और खुले-पहुंच वाले शोध पत्रों का व्यापक खोज योग्य भंडार जो अपलोड के साथ सिंक होता है।",
+                explore_repository: "भंडार देखें",
+                stat_stations: "सक्रिय अनुसंधान स्टेशन",
+                stat_papers: "अनुक्रमणित शोध पत्र",
+                stat_media: "मीडिया संपत्तियां और वीडियो",
+                stat_telemetry: "लाइव टेलीमेट्री फीड",
+                research_heading: "ध्रुवीय अनुसंधान और ज्ञान भंडार",
+                research_sub: "सहकर्मी-समीक्षा अध्ययन और एडमिन-अपलोड किए गए शोध पत्र एक्सेस करें।",
+                media_heading: "ध्रुवीय मीडिया और ज्ञान भंडार",
+                media_sub: "चयनित छवियां, वृत्तचित्र फुटेज और मीडिया संपत्ति।",
+                analytics_heading: "ध्रुवीय जलवायु एनालिटिक्स डैशबोर्ड",
+                analytics_sub: "चार्ट.जेएस द्वारा संचालित वास्तविक समय टेलीमेट्री और जलवायु मेट्रिक्स।",
+                search_heading: "वैश्विक ध्रुवीय ज्ञान खोज",
+                search_sub: "सभी अभियान लॉग, स्टेशन टेलीमेट्री और शोध पत्रों में तुरंत खोजें।",
+                news_heading: "हाल के ध्रुवीय अभियान और समाचार",
+                news_sub: "आर्कटिक और अंटार्कटिक में क्षेत्र शोधकर्ताओं से लाइव प्रेषण।",
+                admin_heading: "एडमिन और शोधकर्ता अपलोड पोर्टल",
+                admin_sub: "स्थानीय भंडारण के साथ शोध पत्र और टेलीमेट्री डेटासेट प्रकाशित करें।",
+                footer_brand: "पोलर ज़ोन पोर्टल",
+                footer_copyright: "© 2026 पोलर ज़ोन। स्मार्ट इंडिया हैकथॉन (एसआईएच #26063) के लिए विकसित। एक ही स्थान पर सभी जानकारी।",
+                footer_privacy: "गोपनीयता",
+                footer_terms: "नियम",
+                footer_contact: "संपर्क"
+            }
+        };
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'en' ? 'hi' : 'en';
+            document.getElementById('lang-label').textContent = currentLang === 'en' ? 'हिन्दी / ENG' : 'ENGLISH / हिन्दी';
+            
+            const keys = document.querySelectorAll('[data-i18n]');
+            keys.forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) {
+                    el.textContent = translations[currentLang][key];
+                }
+            });
+            showToast(currentLang === 'hi' ? 'भाषा बदलकर हिंदी कर दी गई है' : 'Language switched to English');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderRepositoriesAndAdminList();
+        });
+    </script>
+</body>
+</html>
